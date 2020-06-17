@@ -5,6 +5,7 @@ import json
 import urllib.request
 import ssl
 import time
+import subprocess
 
 import ipaddress
 from ipaddress import ip_network
@@ -18,58 +19,78 @@ parser.add_argument("-to", "--token", help="Bearer token")
 parser.add_argument("-ho", "--host", help="Target host")
 parser.add_argument("-co", "--count", help="Number of child CA to add")
 parser.add_argument("-rd", "--roadepth", help="Depth to break prefix to create roas for")
+parser.add_argument("-mo", "--mode", help="cli or http", default="cli")
 parser.add_argument("-st", "--sleeptime", help="seconds to sleep between request to prevent overwhelminh", default=2)
 
 args = parser.parse_args()
 no_ca = args.count
 host = args.host
 token = args.token
+mode = args.mode
 roa_depth = int(args.roadepth) - 1
-sleep_time = int(args.sleeptime)
+sleep_time = float(args.sleeptime)
+
+if mode != "cli" and mode != "http":
+    print("specify mode using -mo flag. cli and http are supported mode")
+    exit(-1)
+
+
 
 
 # cargo run --bin krillc add --ca ca_in --token itworks
 def add_ca(ca_handle, server):
-    url = f"{server}/api/v1/cas"
-    req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    jsondata = json.dumps({"handle": ca_handle})
-    jsondataasbytes = jsondata.encode('utf-8')
-    req.add_header('Content-Length', len(jsondataasbytes))
-    return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    if mode == "http":
+       url = f"{server}/api/v1/cas"
+       req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
+       req.add_header('Content-Type', 'application/json; charset=utf-8')
+       jsondata = json.dumps({"handle": ca_handle})
+       jsondataasbytes = jsondata.encode('utf-8')
+       req.add_header('Content-Length', len(jsondataasbytes))
+       return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    else:
+        subprocess.call(f"krillc add --ca {ca_handle} --token {str(token)}", shell=True)
 
 # cargo run --bin krillc parents add embedded --ca ca_in --parent ta --token itworks
 def add_as_ta_child(ca_handle, server):
-    # https://{domain}:{port}/api/v1/cas/{ca_handle}/parents
-    url = f"{server}/api/v1/cas/{ca_handle}/parents"
-    req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    jsondata = json.dumps({"handle": "ta", "contact" : "embedded"})
-    jsondataasbytes = jsondata.encode('utf-8')
-    req.add_header('Content-Length', len(jsondataasbytes))
-    return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    if mode == "http":
+        # https://{domain}:{port}/api/v1/cas/{ca_handle}/parents
+        url = f"{server}/api/v1/cas/{ca_handle}/parents"
+        req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
+        req.add_header('Content-Type', 'application/json; charset=utf-8')
+        jsondata = json.dumps({"handle": "ta", "contact" : "embedded"})
+        jsondataasbytes = jsondata.encode('utf-8')
+        req.add_header('Content-Length', len(jsondataasbytes))
+        return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    else:
+        subprocess.call(f"krillc parents add embedded --ca {ca_handle} --parent ta --token {str(token)}", shell=True)
 
 # cargo run --bin krillc repo update embedded --ca ca_in --token itworks
 def grant_repo_rights(ca_handle, server):
-    # https://{domain}:{port}/api/v1/cas/{ca_handle}/repo
-    url = f"{server}/api/v1/cas/{ca_handle}/repo"
-    req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    jsondata = json.dumps("embedded")
-    jsondataasbytes = jsondata.encode('utf-8')
-    req.add_header('Content-Length', len(jsondataasbytes))
-    return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    if mode == "http":
+        # https://{domain}:{port}/api/v1/cas/{ca_handle}/repo
+        url = f"{server}/api/v1/cas/{ca_handle}/repo"
+        req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
+        req.add_header('Content-Type', 'application/json; charset=utf-8')
+        jsondata = json.dumps("embedded")
+        jsondataasbytes = jsondata.encode('utf-8')
+        req.add_header('Content-Length', len(jsondataasbytes))
+        return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    else:
+        subprocess.call(f"krillc repo update embedded --ca {ca_handle} --token {str(token)}", shell=True)
 
 # cargo run --bin krillc children add embedded --ca ta --token itworks --child ca_in --ipv4 "100.0.0.0/8,200.0.0.0/8"
 def delegete_resource(ca_handle, server, index):
-    # https://{domain}:{port}/api/v1/cas/{ca_handle}/children
-    url = f"{server}/api/v1/cas/ta/children"
-    req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
-    req.add_header('Content-Type', 'application/json; charset=utf-8')
-    jsondata = json.dumps({"handle": ca_handle,"resources": {"asn": "", "v4": f"{index}.0.0.0/8", "v6":""},"auth": "embedded"})
-    jsondataasbytes = jsondata.encode('utf-8')
-    req.add_header('Content-Length', len(jsondataasbytes))
-    return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    if mode == "http":
+       # https://{domain}:{port}/api/v1/cas/{ca_handle}/children
+       url = f"{server}/api/v1/cas/ta/children"
+       req = urllib.request.Request(url, None, {"Authorization": f"Bearer {str(token)}"})
+       req.add_header('Content-Type', 'application/json; charset=utf-8')
+       jsondata = json.dumps({"handle": ca_handle,"resources": {"asn": "", "v4": f"{index}.0.0.0/8", "v6":""},"auth": "embedded"})
+       jsondataasbytes = jsondata.encode('utf-8')
+       req.add_header('Content-Length', len(jsondataasbytes))
+       return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
+    else:
+        subprocess.call(f"krillc children add embedded --ca ta --token itworks --child {ca_handle} --ipv4 {index}.0.0.0/8", shell=True)
 
 def add_roa(ca_handle, server, index, r_depth):
     # https://{domain}:{port}/api/v1/cas/{ca_handle}/routes
@@ -121,6 +142,12 @@ for n in range(int(no_ca)):
     except Exception as e: 
          print("adding ca failed with", e)
     try:
+        delegete_resource(ca, host, index)
+        print(f"successfully delegated resources to {ca}")
+        time.sleep(sleep_time)
+    except Exception as e: 
+         print("delegating resource failed with", e)
+    try:
         add_as_ta_child(ca, host)
         print(f"successfully added {ca} as a child of TA")
         time.sleep(sleep_time)
@@ -132,12 +159,6 @@ for n in range(int(no_ca)):
         time.sleep(sleep_time)
     except Exception as e: 
          print("granting repo rights failed with", e)
-    try:
-        delegete_resource(ca, host, index)
-        print(f"successfully delegated resources to {ca}")
-        time.sleep(sleep_time)
-    except Exception as e: 
-         print("delegating resource failed with", e)
     try:
         time.sleep(sleep_time*2)
         add_roa(ca, host, index, roa_depth)
