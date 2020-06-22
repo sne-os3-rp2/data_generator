@@ -90,7 +90,7 @@ def delegete_resource(ca_handle, server, index):
        req.add_header('Content-Length', len(jsondataasbytes))
        return urllib.request.urlopen(req, jsondataasbytes, context=gcontext)
     else:
-        subprocess.call(f"krillc children add embedded --ca ta --token itworks --child {ca_handle} --ipv4 {index}.0.0.0/8", shell=True)
+        subprocess.call(f"krillc children add embedded --ca ta --token {str(token)} --child {ca_handle} --ipv4 {index}.0.0.0/8", shell=True)
 
 def add_roa(ca_handle, server, index, r_depth):
     # https://{domain}:{port}/api/v1/cas/{ca_handle}/routes
